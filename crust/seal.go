@@ -3,11 +3,10 @@ package crust
 import (
 	"context"
 
+	"github.com/crustio/go-ipfs-encryptor/utils"
 	"github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )
-
-var sealedMap map[cid.Cid]map[cid.Cid]SealedBlock
 
 var sealBlackSet map[cid.Cid]bool
 var sealBlackList = []string{
@@ -16,7 +15,6 @@ var sealBlackList = []string{
 }
 
 func init() {
-	sealedMap = make(map[cid.Cid]map[cid.Cid]SealedBlock)
 	sealBlackSet = make(map[cid.Cid]bool)
 	for _, v := range sealBlackList {
 		c, _ := cid.Decode(v)
@@ -24,52 +22,60 @@ func init() {
 	}
 }
 
-func startSeal(root cid.Cid, value []byte) (bool, error) {
-	sealedMap[root] = make(map[cid.Cid]SealedBlock)
-	sb := SealedBlock{
-		SHash: root.String(),
-		Size:  len(value),
-		Data:  value,
+func startSeal(root cid.Cid, value []byte, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
+	canSeal, path, err := sw.seal(root, sessionKey, false, value)
+	if err != nil || !canSeal {
+		return canSeal, err
 	}
-	sealedMap[root][root] = sb
+
+	sb := SealedBlock{
+		Path: path,
+		Size: len(value),
+	}
+
+	(*sealedMap)[root] = sb
 	return true, nil
 }
 
-func sealBlock(root cid.Cid, leaf cid.Cid, value []byte) error {
-	sb := SealedBlock{
-		SHash: leaf.String(),
-		Size:  len(value),
-		Data:  value,
+func sealBlock(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
+	canSeal, path, err := sw.seal(root, sessionKey, false, value)
+	if err != nil || !canSeal {
+		return canSeal, err
 	}
-	sealedMap[root][leaf] = sb
-	return nil
+
+	sb := SealedBlock{
+		Path: path,
+		Size: len(value),
+	}
+
+	(*sealedMap)[leaf] = sb
+	return true, nil
 }
 
-func endSeal(root cid.Cid) (map[cid.Cid]SealedBlock, error) {
-	resMap := sealedMap[root]
-	delete(sealedMap, root)
-	return resMap, nil
+func endSeal(root cid.Cid, sessionKey string) (bool, error) {
+	canSeal, _, err := sw.seal(root, sessionKey, false, []byte{})
+	return canSeal, err
 }
 
-func deepSeal(ctx context.Context, rootNode ipld.Node, serv ipld.DAGService) error {
+func deepSeal(ctx context.Context, rootNode ipld.Node, serv ipld.DAGService, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
 	for i := 0; i < len(rootNode.Links()); i++ {
 		leafNode, err := serv.Get(ctx, rootNode.Links()[i].Cid)
 		if err != nil {
-			return err
+			return false, err
 		}
 
-		err = deepSeal(ctx, leafNode, serv)
-		if err != nil {
-			return err
+		canSeal, err := deepSeal(ctx, leafNode, serv, sessionKey, sealedMap)
+		if err != nil || !canSeal {
+			return canSeal, err
 		}
 
-		err = sealBlock(rootNode.Cid(), leafNode.Cid(), leafNode.RawData())
-		if err != nil {
-			return err
+		canSeal, err = sealBlock(rootNode.Cid(), leafNode.Cid(), leafNode.RawData(), sessionKey, sealedMap)
+		if err != nil || !canSeal {
+			return canSeal, err
 		}
 	}
 
-	return nil
+	return true, nil
 }
 
 func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[cid.Cid]SealedBlock, error) {
@@ -78,21 +84,23 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 		return false, nil, nil
 	}
 
+	sealedMap := make(map[cid.Cid]SealedBlock)
+	sessionKey := utils.RandStringRunes(8)
 	rootNode, err := serv.Get(ctx, root)
 	if err != nil {
-		return true, nil, err
+		return false, nil, err
 	}
 
-	needSeal, err := startSeal(rootNode.Cid(), rootNode.RawData())
-	if !needSeal || err != nil {
-		return needSeal, nil, err
+	canSeal, err := startSeal(rootNode.Cid(), rootNode.RawData(), sessionKey, &sealedMap)
+	if err != nil || !canSeal {
+		return canSeal, nil, err
 	}
 
-	err = deepSeal(ctx, rootNode, serv)
-	if err != nil {
-		return true, nil, err
+	canSeal, err = deepSeal(ctx, rootNode, serv, sessionKey, &sealedMap)
+	if err != nil || !canSeal {
+		return canSeal, nil, err
 	}
 
-	sb, err := endSeal(root)
-	return true, sb, err
+	canSeal, err = endSeal(root, sessionKey)
+	return canSeal, sealedMap, err
 }

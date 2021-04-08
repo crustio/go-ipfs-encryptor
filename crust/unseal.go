@@ -4,21 +4,6 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func Replace(item *badger.Item) ([]byte, error) {
-	value, err := item.ValueCopy(nil)
-	if err != nil {
-		return value, err
-	}
-
-	if ok, si := TryGetSealedInfo(value); ok {
-		// TODO: Unseal
-		// TODO: Loop for unseal and delete
-		return si.Sbs[0].Data, nil
-	}
-
-	return value, nil
-}
-
 func Unseal(item *badger.Item) ([]byte, error) {
 	value, err := item.ValueCopy(nil)
 	if err != nil {
@@ -26,9 +11,8 @@ func Unseal(item *badger.Item) ([]byte, error) {
 	}
 
 	if ok, si := TryGetSealedInfo(value); ok {
-		// TODO: Unseal
 		// TODO: Loop for unseal and delete
-		return si.Sbs[0].Data, nil
+		return sw.unseal(si.Sbs[0].Path)
 	}
 
 	return value, nil
