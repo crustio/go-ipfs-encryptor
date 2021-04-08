@@ -95,6 +95,9 @@ func (sw *SWorker) unseal(path string) ([]byte, error) {
 			return nil, err
 		}
 		return returnBody, nil
+	} else if resp.StatusCode == 404 {
+		resp.Body.Close()
+		return nil, nil
 	} else {
 		resp.Body.Close()
 		return nil, fmt.Errorf("Unseal error code is: %d", resp.StatusCode)
