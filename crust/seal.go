@@ -57,19 +57,19 @@ func endSeal(root cid.Cid, sessionKey string) (bool, error) {
 	return canSeal, err
 }
 
-func deepSeal(ctx context.Context, rootNode ipld.Node, serv ipld.DAGService, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
+func deepSeal(ctx context.Context, originRootCid cid.Cid, rootNode ipld.Node, serv ipld.DAGService, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
 	for i := 0; i < len(rootNode.Links()); i++ {
 		leafNode, err := serv.Get(ctx, rootNode.Links()[i].Cid)
 		if err != nil {
 			return false, err
 		}
 
-		canSeal, err := deepSeal(ctx, leafNode, serv, sessionKey, sealedMap)
+		canSeal, err := deepSeal(ctx, originRootCid, leafNode, serv, sessionKey, sealedMap)
 		if err != nil || !canSeal {
 			return canSeal, err
 		}
 
-		canSeal, err = sealBlock(rootNode.Cid(), leafNode.Cid(), leafNode.RawData(), sessionKey, sealedMap)
+		canSeal, err = sealBlock(originRootCid, leafNode.Cid(), leafNode.RawData(), sessionKey, sealedMap)
 		if err != nil || !canSeal {
 			return canSeal, err
 		}
@@ -96,7 +96,7 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 		return canSeal, nil, err
 	}
 
-	canSeal, err = deepSeal(ctx, rootNode, serv, sessionKey, &sealedMap)
+	canSeal, err = deepSeal(ctx, rootNode.Cid(), rootNode, serv, sessionKey, &sealedMap)
 	if err != nil || !canSeal {
 		return canSeal, nil, err
 	}
