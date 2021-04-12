@@ -27,7 +27,7 @@ func NewSWorker(url string) *SWorker {
 	client := http.Client{
 		Timeout: 1000 * time.Second,
 		Transport: &http.Transport{
-			DisableKeepAlives: true,
+			DisableKeepAlives: false,
 		},
 	}
 	return &SWorker{url: url, client: client}
