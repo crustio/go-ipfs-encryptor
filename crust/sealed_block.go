@@ -5,9 +5,8 @@ import (
 )
 
 type SealedBlock struct {
-	SHash string `json:"s_hash"`
-	Size  int    `json:"size"`
-	Data  []byte `json:"data"`
+	Path string `json:"path"`
+	Size int    `json:"size"`
 }
 
 func TryGetSealedBlock(value []byte) (bool, *SealedBlock) {
