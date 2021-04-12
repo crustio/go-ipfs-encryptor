@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -66,6 +67,7 @@ func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte
 
 		return true, sealResp.Path, nil
 	} else {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 		return false, "", fmt.Errorf("Seal error code is: %d", resp.StatusCode)
 	}
@@ -96,9 +98,11 @@ func (sw *SWorker) unseal(path string) ([]byte, error) {
 		}
 		return returnBody, nil
 	} else if resp.StatusCode == 404 {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 		return nil, nil
 	} else {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 		return nil, fmt.Errorf("Unseal error code is: %d", resp.StatusCode)
 	}
