@@ -50,7 +50,7 @@ func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string,
 		Size: len(value),
 	}
 
-	serialMap.add(root, sb)
+	serialMap.add(leaf, sb)
 	lpool.Done()
 }
 
@@ -140,7 +140,8 @@ type serialMap struct {
 
 func newSerialMap() *serialMap {
 	m := &serialMap{
-		data: make(map[cid.Cid]SealedBlock),
+		data:  make(map[cid.Cid]SealedBlock),
+		rinfo: make(chan returnInfo, 16),
 	}
 	return m
 }
