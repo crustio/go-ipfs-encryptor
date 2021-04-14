@@ -2,6 +2,7 @@ package crust
 
 import (
 	"context"
+	"sync"
 
 	"github.com/crustio/go-ipfs-encryptor/utils"
 	"github.com/ipfs/go-cid"
@@ -22,10 +23,26 @@ func init() {
 	}
 }
 
-func startSeal(root cid.Cid, value []byte, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
+func startSeal(root cid.Cid, value []byte, sessionKey string) (returnInfo, *SealedBlock) {
 	canSeal, path, err := sw.seal(root, sessionKey, false, value)
 	if err != nil || !canSeal {
-		return canSeal, err
+		return returnInfo{canSeal: canSeal, err: err}, nil
+	}
+
+	sb := &SealedBlock{
+		Path: path,
+		Size: len(value),
+	}
+
+	return returnInfo{canSeal: true, err: nil}, sb
+}
+
+func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string, serialMap *serialMap, lpool *utils.Lpool) {
+	canSeal, path, err := sw.seal(root, sessionKey, false, value)
+	if err != nil || !canSeal {
+		serialMap.rinfo <- returnInfo{canSeal: canSeal, err: err}
+		lpool.Done()
+		return
 	}
 
 	sb := SealedBlock{
@@ -33,49 +50,38 @@ func startSeal(root cid.Cid, value []byte, sessionKey string, sealedMap *map[cid
 		Size: len(value),
 	}
 
-	(*sealedMap)[root] = sb
-	return true, nil
+	serialMap.add(leaf, sb)
+	lpool.Done()
 }
 
-func sealBlock(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
-	canSeal, path, err := sw.seal(root, sessionKey, false, value)
-	if err != nil || !canSeal {
-		return canSeal, err
-	}
-
-	sb := SealedBlock{
-		Path: path,
-		Size: len(value),
-	}
-
-	(*sealedMap)[leaf] = sb
-	return true, nil
-}
-
-func endSeal(root cid.Cid, sessionKey string) (bool, error) {
+func endSeal(root cid.Cid, sessionKey string) returnInfo {
 	canSeal, _, err := sw.seal(root, sessionKey, false, []byte{})
-	return canSeal, err
+	return returnInfo{canSeal: canSeal, err: err}
 }
 
-func deepSeal(ctx context.Context, originRootCid cid.Cid, rootNode ipld.Node, serv ipld.DAGService, sessionKey string, sealedMap *map[cid.Cid]SealedBlock) (bool, error) {
+func deepSeal(ctx context.Context, originRootCid cid.Cid, rootNode ipld.Node, serv ipld.DAGService, sessionKey string, sealedMap *serialMap, lpool *utils.Lpool) returnInfo {
 	for i := 0; i < len(rootNode.Links()); i++ {
+		select {
+		case rinfo := <-sealedMap.rinfo:
+			return rinfo
+		default:
+		}
+
 		leafNode, err := serv.Get(ctx, rootNode.Links()[i].Cid)
 		if err != nil {
-			return false, err
+			return returnInfo{canSeal: false, err: err}
 		}
 
-		canSeal, err := deepSeal(ctx, originRootCid, leafNode, serv, sessionKey, sealedMap)
-		if err != nil || !canSeal {
-			return canSeal, err
+		rinfo := deepSeal(ctx, originRootCid, leafNode, serv, sessionKey, sealedMap, lpool)
+		if rinfo.err != nil || !rinfo.canSeal {
+			return rinfo
 		}
 
-		canSeal, err = sealBlock(originRootCid, leafNode.Cid(), leafNode.RawData(), sessionKey, sealedMap)
-		if err != nil || !canSeal {
-			return canSeal, err
-		}
+		lpool.Add(1)
+		go sealBlockAsync(originRootCid, leafNode.Cid(), leafNode.RawData(), sessionKey, sealedMap, lpool)
 	}
 
-	return true, nil
+	return returnInfo{canSeal: true, err: nil}
 }
 
 func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[cid.Cid]SealedBlock, error) {
@@ -84,23 +90,64 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 		return false, nil, nil
 	}
 
-	sealedMap := make(map[cid.Cid]SealedBlock)
+	// Base data
+	sealedMap := newSerialMap()
 	sessionKey := utils.RandStringRunes(8)
+
+	// Start seal root block
 	rootNode, err := serv.Get(ctx, root)
 	if err != nil {
 		return false, nil, err
 	}
 
-	canSeal, err := startSeal(rootNode.Cid(), rootNode.RawData(), sessionKey, &sealedMap)
-	if err != nil || !canSeal {
-		return canSeal, nil, err
+	rinfo, sb := startSeal(rootNode.Cid(), rootNode.RawData(), sessionKey)
+	if rinfo.err != nil || !rinfo.canSeal {
+		return rinfo.canSeal, nil, rinfo.err
+	}
+	sealedMap.data[rootNode.Cid()] = *sb
+
+	// Multi-threaded deep seal
+	lpool := utils.NewLpool(4)
+	rinfo = deepSeal(ctx, rootNode.Cid(), rootNode, serv, sessionKey, sealedMap, lpool)
+	if rinfo.err != nil || !rinfo.canSeal {
+		return rinfo.canSeal, nil, rinfo.err
 	}
 
-	canSeal, err = deepSeal(ctx, rootNode.Cid(), rootNode, serv, sessionKey, &sealedMap)
-	if err != nil || !canSeal {
-		return canSeal, nil, err
+	lpool.Wait()
+	select {
+	case rinfo := <-sealedMap.rinfo:
+		return rinfo.canSeal, nil, rinfo.err
+	default:
 	}
 
-	canSeal, err = endSeal(root, sessionKey)
-	return canSeal, sealedMap, err
+	// End seal
+	rinfo = endSeal(root, sessionKey)
+
+	return rinfo.canSeal, sealedMap.data, rinfo.err
+}
+
+type returnInfo struct {
+	canSeal bool
+	err     error
+}
+
+// Convert map to serial map
+type serialMap struct {
+	data  map[cid.Cid]SealedBlock
+	lock  sync.Mutex
+	rinfo chan returnInfo
+}
+
+func newSerialMap() *serialMap {
+	m := &serialMap{
+		data:  make(map[cid.Cid]SealedBlock),
+		rinfo: make(chan returnInfo, 16),
+	}
+	return m
+}
+
+func (m *serialMap) add(key cid.Cid, sb SealedBlock) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.data[key] = sb
 }
