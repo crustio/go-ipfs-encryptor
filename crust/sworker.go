@@ -49,6 +49,11 @@ func (sw *SWorker) GetUrl() string {
 }
 
 func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte) (bool, string, error) {
+	// Not config sworker
+	if len(sw.GetUrl()) == 0 {
+		return false, "", nil
+	}
+
 	// Generate request
 	url := fmt.Sprintf("%s/storage/seal?cid=%s&session_key=%s&is_link=%t", sw.GetUrl(), ci.String(), sessionKey, isLink)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(value))
@@ -90,6 +95,11 @@ func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte
 }
 
 func (sw *SWorker) unseal(path string) ([]byte, error) {
+	// Not config sworker
+	if len(sw.GetUrl()) == 0 {
+		return nil, fmt.Errorf("Missing crust config")
+	}
+
 	// Generate request
 	url := fmt.Sprintf("%s/storage/unseal", sw.GetUrl())
 	body := fmt.Sprintf("{\"path\":\"%s\"}", path)
@@ -123,9 +133,8 @@ func (sw *SWorker) unseal(path string) ([]byte, error) {
 	}
 }
 
-// TODO: config
 var Worker *SWorker = nil
 
 func init() {
-	Worker = NewSWorker("http://127.0.0.1:12222/api/v0")
+	Worker = NewSWorker("")
 }
