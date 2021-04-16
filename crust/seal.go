@@ -24,7 +24,7 @@ func init() {
 }
 
 func startSeal(root cid.Cid, value []byte, sessionKey string) (returnInfo, *SealedBlock) {
-	canSeal, path, err := sw.seal(root, sessionKey, false, value)
+	canSeal, path, err := Worker.seal(root, sessionKey, false, value)
 	if err != nil || !canSeal {
 		return returnInfo{canSeal: canSeal, err: err}, nil
 	}
@@ -38,7 +38,7 @@ func startSeal(root cid.Cid, value []byte, sessionKey string) (returnInfo, *Seal
 }
 
 func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string, serialMap *serialMap, lpool *utils.Lpool) {
-	canSeal, path, err := sw.seal(root, sessionKey, false, value)
+	canSeal, path, err := Worker.seal(root, sessionKey, false, value)
 	if err != nil || !canSeal {
 		serialMap.rinfo <- returnInfo{canSeal: canSeal, err: err}
 		lpool.Done()
@@ -55,7 +55,7 @@ func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string,
 }
 
 func endSeal(root cid.Cid, sessionKey string) returnInfo {
-	canSeal, _, err := sw.seal(root, sessionKey, false, []byte{})
+	canSeal, _, err := Worker.seal(root, sessionKey, false, []byte{})
 	return returnInfo{canSeal: canSeal, err: err}
 }
 
