@@ -7,7 +7,7 @@ import (
 )
 
 func Unseal(path string) ([]byte, error) {
-	return sw.unseal(path)
+	return Worker.unseal(path)
 }
 
 func GetSize(item *badger.Item) (int, error) {

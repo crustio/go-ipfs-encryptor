@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -19,6 +20,7 @@ type sealResponse struct {
 }
 
 type SWorker struct {
+	lock   sync.Mutex
 	url    string
 	client http.Client
 }
@@ -33,9 +35,27 @@ func NewSWorker(url string) *SWorker {
 	return &SWorker{url: url, client: client}
 }
 
+func (sw *SWorker) SetUrl(url string) {
+	sw.lock.Lock()
+	defer sw.lock.Unlock()
+	sw.url = url
+}
+
+func (sw *SWorker) GetUrl() string {
+	sw.lock.Lock()
+	defer sw.lock.Unlock()
+	url := sw.url
+	return url
+}
+
 func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte) (bool, string, error) {
+	// Not config sworker
+	if len(sw.GetUrl()) == 0 {
+		return false, "", nil
+	}
+
 	// Generate request
-	url := fmt.Sprintf("%s/storage/seal?cid=%s&session_key=%s&is_link=%t", sw.url, ci.String(), sessionKey, isLink)
+	url := fmt.Sprintf("%s/storage/seal?cid=%s&session_key=%s&is_link=%t", sw.GetUrl(), ci.String(), sessionKey, isLink)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(value))
 	if err != nil {
 		return false, "", err
@@ -75,8 +95,13 @@ func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte
 }
 
 func (sw *SWorker) unseal(path string) ([]byte, error) {
+	// Not config sworker
+	if len(sw.GetUrl()) == 0 {
+		return nil, fmt.Errorf("Missing crust config")
+	}
+
 	// Generate request
-	url := fmt.Sprintf("%s/storage/unseal", sw.url)
+	url := fmt.Sprintf("%s/storage/unseal", sw.GetUrl())
 	body := fmt.Sprintf("{\"path\":\"%s\"}", path)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(body)))
 	if err != nil {
@@ -108,9 +133,8 @@ func (sw *SWorker) unseal(path string) ([]byte, error) {
 	}
 }
 
-// TODO: config
-var sw *SWorker = nil
+var Worker *SWorker = nil
 
 func init() {
-	sw = NewSWorker("http://127.0.0.1:12222/api/v0")
+	Worker = NewSWorker("")
 }
