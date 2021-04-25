@@ -48,14 +48,61 @@ func (sw *SWorker) GetUrl() string {
 	return url
 }
 
-func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte) (bool, string, error) {
+func (sw *SWorker) startSeal(ci cid.Cid) (bool, error) {
+	// Not config sworker
+	if len(sw.GetUrl()) == 0 {
+		return false, nil
+	}
+
+	// Generate request
+	url := fmt.Sprintf("%s/storage/seal_start", sw.GetUrl())
+	value := fmt.Sprintf("{\"cid\":\"%s\"}", ci.String())
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
+	if err != nil {
+		return false, err
+	}
+
+	// Request
+	resp, err := sw.client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	// Deal response
+	if resp.StatusCode == 200 {
+		returnBody, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return false, err
+		}
+		sealResp := &sealResponse{}
+		err = json.Unmarshal(returnBody, sealResp)
+		if err != nil {
+			return false, err
+		}
+
+		if sealResp.StatusCode != 0 {
+			fmt.Printf("%s\n", string(returnBody))
+			return false, nil
+		}
+
+		return true, nil
+	} else {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+		return false, fmt.Errorf("Start seal error code is: %d", resp.StatusCode)
+	}
+
+}
+
+func (sw *SWorker) seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
 		return false, "", nil
 	}
 
 	// Generate request
-	url := fmt.Sprintf("%s/storage/seal?cid=%s&session_key=%s&is_link=%t", sw.GetUrl(), ci.String(), sessionKey, isLink)
+	url := fmt.Sprintf("%s/storage/seal?cid=%s&new_block=%t", sw.GetUrl(), ci.String(), newBlock)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(value))
 	if err != nil {
 		return false, "", err
@@ -90,6 +137,53 @@ func (sw *SWorker) seal(ci cid.Cid, sessionKey string, isLink bool, value []byte
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 		return false, "", fmt.Errorf("Seal error code is: %d", resp.StatusCode)
+	}
+
+}
+
+func (sw *SWorker) endSeal(ci cid.Cid) (bool, error) {
+	// Not config sworker
+	if len(sw.GetUrl()) == 0 {
+		return false, nil
+	}
+
+	// Generate request
+	url := fmt.Sprintf("%s/storage/seal_end", sw.GetUrl())
+	value := fmt.Sprintf("{\"cid\":\"%s\"}", ci.String())
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
+	if err != nil {
+		return false, err
+	}
+
+	// Request
+	resp, err := sw.client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	// Deal response
+	if resp.StatusCode == 200 {
+		returnBody, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return false, err
+		}
+		sealResp := &sealResponse{}
+		err = json.Unmarshal(returnBody, sealResp)
+		if err != nil {
+			return false, err
+		}
+
+		if sealResp.StatusCode != 0 {
+			fmt.Printf("%s\n", string(returnBody))
+			return false, nil
+		}
+
+		return true, nil
+	} else {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+		return false, fmt.Errorf("Start seal error code is: %d", resp.StatusCode)
 	}
 
 }

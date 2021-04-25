@@ -23,8 +23,13 @@ func init() {
 	}
 }
 
-func startSeal(root cid.Cid, value []byte, sessionKey string) (returnInfo, *SealedBlock) {
-	canSeal, path, err := Worker.seal(root, sessionKey, false, value)
+func startSeal(root cid.Cid, value []byte) (returnInfo, *SealedBlock) {
+	canSeal, err := Worker.startSeal(root)
+	if err != nil || !canSeal {
+		return returnInfo{canSeal: canSeal, err: err}, nil
+	}
+
+	canSeal, path, err := Worker.seal(root, false, value)
 	if err != nil || !canSeal {
 		return returnInfo{canSeal: canSeal, err: err}, nil
 	}
@@ -37,8 +42,8 @@ func startSeal(root cid.Cid, value []byte, sessionKey string) (returnInfo, *Seal
 	return returnInfo{canSeal: true, err: nil}, sb
 }
 
-func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string, serialMap *serialMap, lpool *utils.Lpool) {
-	canSeal, path, err := Worker.seal(root, sessionKey, false, value)
+func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, serialMap *serialMap, lpool *utils.Lpool) {
+	canSeal, path, err := Worker.seal(root, false, value)
 	if err != nil || !canSeal {
 		serialMap.rinfo <- returnInfo{canSeal: canSeal, err: err}
 		lpool.Done()
@@ -54,12 +59,12 @@ func sealBlockAsync(root cid.Cid, leaf cid.Cid, value []byte, sessionKey string,
 	lpool.Done()
 }
 
-func endSeal(root cid.Cid, sessionKey string) returnInfo {
-	canSeal, _, err := Worker.seal(root, sessionKey, false, []byte{})
+func endSeal(root cid.Cid) returnInfo {
+	canSeal, err := Worker.endSeal(root)
 	return returnInfo{canSeal: canSeal, err: err}
 }
 
-func deepSeal(ctx context.Context, originRootCid cid.Cid, rootNode ipld.Node, serv ipld.DAGService, sessionKey string, sealedMap *serialMap, lpool *utils.Lpool) returnInfo {
+func deepSeal(ctx context.Context, originRootCid cid.Cid, rootNode ipld.Node, serv ipld.DAGService, sealedMap *serialMap, lpool *utils.Lpool) returnInfo {
 	for i := 0; i < len(rootNode.Links()); i++ {
 		select {
 		case rinfo := <-sealedMap.rinfo:
@@ -72,13 +77,13 @@ func deepSeal(ctx context.Context, originRootCid cid.Cid, rootNode ipld.Node, se
 			return returnInfo{canSeal: false, err: err}
 		}
 
-		rinfo := deepSeal(ctx, originRootCid, leafNode, serv, sessionKey, sealedMap, lpool)
+		rinfo := deepSeal(ctx, originRootCid, leafNode, serv, sealedMap, lpool)
 		if rinfo.err != nil || !rinfo.canSeal {
 			return rinfo
 		}
 
 		lpool.Add(1)
-		go sealBlockAsync(originRootCid, leafNode.Cid(), leafNode.RawData(), sessionKey, sealedMap, lpool)
+		go sealBlockAsync(originRootCid, leafNode.Cid(), leafNode.RawData(), sealedMap, lpool)
 	}
 
 	return returnInfo{canSeal: true, err: nil}
@@ -92,7 +97,6 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 
 	// Base data
 	sealedMap := newSerialMap()
-	sessionKey := utils.RandStringRunes(8)
 
 	// Start seal root block
 	rootNode, err := serv.Get(ctx, root)
@@ -100,7 +104,7 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 		return false, nil, err
 	}
 
-	rinfo, sb := startSeal(rootNode.Cid(), rootNode.RawData(), sessionKey)
+	rinfo, sb := startSeal(rootNode.Cid(), rootNode.RawData())
 	if rinfo.err != nil || !rinfo.canSeal {
 		return rinfo.canSeal, nil, rinfo.err
 	}
@@ -108,7 +112,7 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 
 	// Multi-threaded deep seal
 	lpool := utils.NewLpool(4)
-	rinfo = deepSeal(ctx, rootNode.Cid(), rootNode, serv, sessionKey, sealedMap, lpool)
+	rinfo = deepSeal(ctx, rootNode.Cid(), rootNode, serv, sealedMap, lpool)
 	if rinfo.err != nil || !rinfo.canSeal {
 		return rinfo.canSeal, nil, rinfo.err
 	}
@@ -121,7 +125,7 @@ func Seal(ctx context.Context, root cid.Cid, serv ipld.DAGService) (bool, map[ci
 	}
 
 	// End seal
-	rinfo = endSeal(root, sessionKey)
+	rinfo = endSeal(root)
 
 	return rinfo.canSeal, sealedMap.data, rinfo.err
 }
