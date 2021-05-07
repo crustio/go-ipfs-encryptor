@@ -2,8 +2,41 @@ package crust
 
 import (
 	"encoding/json"
+	"fmt"
+
+	"github.com/ipfs/go-cid"
 )
 
+// Warp sealed block for putting, realize block.Block interface
+type WarpedSealedBlock struct {
+	cid  cid.Cid
+	data []byte
+}
+
+func NewWarpedSealedBlock(path string, size int, c cid.Cid) *WarpedSealedBlock {
+	bv, _ := json.Marshal(SealedBlock{Path: path, Size: size})
+	return &WarpedSealedBlock{data: bv, cid: c}
+}
+
+func (b *WarpedSealedBlock) RawData() []byte {
+	return b.data
+}
+
+func (b *WarpedSealedBlock) Cid() cid.Cid {
+	return b.cid
+}
+
+func (b *WarpedSealedBlock) String() string {
+	return fmt.Sprintf("[Block %s]", b.Cid())
+}
+
+func (b *WarpedSealedBlock) Loggable() map[string]interface{} {
+	return map[string]interface{}{
+		"block": b.Cid().String(),
+	}
+}
+
+// Sealed block info
 type SealedBlock struct {
 	Path string `json:"path"`
 	Size int    `json:"size"`
@@ -23,6 +56,7 @@ func (sb *SealedBlock) ToSealedInfo() *SealedInfo {
 	return &SealedInfo{Sbs: []SealedBlock{*sb}}
 }
 
+// All sealed block info
 type SealedInfo struct {
 	Sbs []SealedBlock `json:"sbs"`
 }

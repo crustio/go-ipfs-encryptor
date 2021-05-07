@@ -13,6 +13,20 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
+var sealBlackSet map[cid.Cid]bool
+var sealBlackList = []string{
+	"QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc",
+	"QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn",
+}
+
+func init() {
+	sealBlackSet = make(map[cid.Cid]bool)
+	for _, v := range sealBlackList {
+		c, _ := cid.Decode(v)
+		sealBlackSet[c] = true
+	}
+}
+
 type sealResponse struct {
 	Path       string `json:"path"`
 	Message    string `json:"message"`
@@ -48,9 +62,13 @@ func (sw *SWorker) GetUrl() string {
 	return url
 }
 
-func (sw *SWorker) startSeal(ci cid.Cid) (bool, error) {
+func (sw *SWorker) StartSeal(ci cid.Cid) (bool, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
+		return false, nil
+	}
+
+	if _, ok := sealBlackSet[ci]; ok {
 		return false, nil
 	}
 
@@ -95,7 +113,7 @@ func (sw *SWorker) startSeal(ci cid.Cid) (bool, error) {
 
 }
 
-func (sw *SWorker) seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, error) {
+func (sw *SWorker) Seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
 		return false, "", nil
@@ -141,7 +159,7 @@ func (sw *SWorker) seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, 
 
 }
 
-func (sw *SWorker) endSeal(ci cid.Cid) (bool, error) {
+func (sw *SWorker) EndSeal(ci cid.Cid) (bool, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
 		return false, nil
