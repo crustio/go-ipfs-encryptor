@@ -15,7 +15,10 @@ func GenSealContext(ctx context.Context, root cid.Cid) context.Context {
 
 func GetRootFromSealContext(ctx context.Context) (cid.Cid, error) {
 	v := ctx.Value(sealContextKey)
-	if buf, ok := v.([]byte); ok {
+	if v == nil {
+		return cid.Undef, fmt.Errorf("Can't find root cid from context")
+	}
+	if buf, ok := v.(string); ok {
 		return cid.Parse(buf)
 	}
 	return cid.Undef, fmt.Errorf("Can't find root cid from context")
