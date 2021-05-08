@@ -36,6 +36,15 @@ func (b *WarpedSealedBlock) Loggable() map[string]interface{} {
 	}
 }
 
+func IsWarpedSealedBlock(block interface{}) bool {
+	switch block.(type) {
+	case *WarpedSealedBlock:
+		return true
+	default:
+		return false
+	}
+}
+
 // Sealed block info
 type SealedBlock struct {
 	Path string `json:"path"`
