@@ -201,7 +201,7 @@ func (sw *SWorker) EndSeal(ci cid.Cid) (bool, error) {
 	} else {
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
-		return false, fmt.Errorf("Start seal error code is: %d", resp.StatusCode)
+		return false, fmt.Errorf("End seal error code is: %d", resp.StatusCode)
 	}
 
 }
