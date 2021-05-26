@@ -58,6 +58,10 @@ func TryGetSealedBlock(value []byte) (bool, *SealedBlock) {
 		return false, nil
 	}
 
+	if sb.Path == "" {
+		return false, nil
+	}
+
 	return true, sb
 }
 
