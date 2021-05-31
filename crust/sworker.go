@@ -206,10 +206,10 @@ func (sw *SWorker) EndSeal(ci cid.Cid) (bool, error) {
 
 }
 
-func (sw *SWorker) unseal(path string) ([]byte, error) {
+func (sw *SWorker) unseal(path string) ([]byte, error, int) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
-		return nil, fmt.Errorf("Missing crust config")
+		return nil, fmt.Errorf("Missing crust config"), 0
 	}
 
 	// Generate request
@@ -217,13 +217,13 @@ func (sw *SWorker) unseal(path string) ([]byte, error) {
 	body := fmt.Sprintf("{\"path\":\"%s\"}", path)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(body)))
 	if err != nil {
-		return nil, err
+		return nil, err, 0
 	}
 
 	// Request
 	resp, err := sw.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, err, 0
 	}
 
 	// Deal response
@@ -231,17 +231,13 @@ func (sw *SWorker) unseal(path string) ([]byte, error) {
 		returnBody, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return nil, err
+			return nil, err, 0
 		}
-		return returnBody, nil
-	} else if resp.StatusCode == 404 {
-		_, _ = io.Copy(ioutil.Discard, resp.Body)
-		resp.Body.Close()
-		return nil, nil
+		return returnBody, nil, 200
 	} else {
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("Unseal error code is: %d", resp.StatusCode)
+		return nil, fmt.Errorf("Unseal error code is: %d", resp.StatusCode), resp.StatusCode
 	}
 }
 

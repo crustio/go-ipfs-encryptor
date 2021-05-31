@@ -6,7 +6,7 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func Unseal(path string) ([]byte, error) {
+func Unseal(path string) ([]byte, error, int) {
 	return Worker.unseal(path)
 }
 
