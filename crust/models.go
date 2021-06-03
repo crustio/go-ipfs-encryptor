@@ -3,6 +3,7 @@ package crust
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/ipfs/go-cid"
 )
@@ -98,4 +99,50 @@ func MergeSealedInfo(a *SealedInfo, b *SealedInfo) *SealedInfo {
 	si := &SealedInfo{}
 	si.Sbs = append(a.Sbs, b.Sbs...)
 	return si
+}
+
+type safeSealedMap struct {
+	sync.RWMutex
+	_map map[cid.Cid]map[cid.Cid]bool
+}
+
+func newSafeSealedMap() *safeSealedMap {
+	sm := new(safeSealedMap)
+	sm._map = make(map[cid.Cid]map[cid.Cid]bool)
+	return sm
+}
+
+func (sm *safeSealedMap) blockExist(root cid.Cid, blockCid cid.Cid) bool {
+	sm.RLock()
+	if bs, ok := sm._map[root]; ok {
+		if _, ok = bs[blockCid]; ok {
+			sm.RUnlock()
+			return true
+		}
+	}
+	sm.RUnlock()
+	return false
+}
+
+func (sm *safeSealedMap) addRoot(root cid.Cid) {
+	sm.Lock()
+	sm._map[root] = make(map[cid.Cid]bool)
+	sm.Unlock()
+}
+
+func (sm *safeSealedMap) addBlock(root cid.Cid, blockCid cid.Cid) {
+	sm.Lock()
+	if _, ok := sm._map[root]; ok {
+		sm._map[root][blockCid] = true
+	} else {
+		sm._map[root] = make(map[cid.Cid]bool)
+		sm._map[root][blockCid] = true
+	}
+	sm.Unlock()
+}
+
+func (sm *safeSealedMap) removeRoot(root cid.Cid) {
+	sm.Lock()
+	delete(sm._map, root)
+	sm.Unlock()
 }

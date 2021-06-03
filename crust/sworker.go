@@ -13,6 +13,7 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
+var sealedMap *safeSealedMap
 var sealBlackSet map[cid.Cid]bool
 var sealBlackList = []string{
 	"QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc",
@@ -20,6 +21,7 @@ var sealBlackList = []string{
 }
 
 func init() {
+	sealedMap = newSafeSealedMap()
 	sealBlackSet = make(map[cid.Cid]bool)
 	for _, v := range sealBlackList {
 		c, _ := cid.Decode(v)
@@ -62,19 +64,19 @@ func (sw *SWorker) GetUrl() string {
 	return url
 }
 
-func (sw *SWorker) StartSeal(ci cid.Cid) (bool, error) {
+func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
 		return false, nil
 	}
 
-	if _, ok := sealBlackSet[ci]; ok {
+	if _, ok := sealBlackSet[root]; ok {
 		return false, nil
 	}
 
 	// Generate request
 	url := fmt.Sprintf("%s/storage/seal_start", sw.GetUrl())
-	value := fmt.Sprintf("{\"cid\":\"%s\"}", ci.String())
+	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
 		return false, err
@@ -103,7 +105,7 @@ func (sw *SWorker) StartSeal(ci cid.Cid) (bool, error) {
 			fmt.Printf("%s\n", string(returnBody))
 			return false, nil
 		}
-
+		sealedMap.addRoot(root)
 		return true, nil
 	} else {
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
@@ -113,14 +115,14 @@ func (sw *SWorker) StartSeal(ci cid.Cid) (bool, error) {
 
 }
 
-func (sw *SWorker) Seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, error) {
+func (sw *SWorker) Seal(root cid.Cid, newBlock bool, value []byte) (bool, string, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
 		return false, "", nil
 	}
 
 	// Generate request
-	url := fmt.Sprintf("%s/storage/seal?cid=%s&new_block=%t", sw.GetUrl(), ci.String(), newBlock)
+	url := fmt.Sprintf("%s/storage/seal?cid=%s&new_block=%t", sw.GetUrl(), root.String(), newBlock)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(value))
 	if err != nil {
 		return false, "", err
@@ -149,7 +151,6 @@ func (sw *SWorker) Seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, 
 			fmt.Printf("%s\n", string(returnBody))
 			return false, "", nil
 		}
-
 		return true, sealResp.Path, nil
 	} else {
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
@@ -159,15 +160,17 @@ func (sw *SWorker) Seal(ci cid.Cid, newBlock bool, value []byte) (bool, string, 
 
 }
 
-func (sw *SWorker) EndSeal(ci cid.Cid) (bool, error) {
+func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
 		return false, nil
 	}
 
+	sealedMap.removeRoot(root)
+
 	// Generate request
 	url := fmt.Sprintf("%s/storage/seal_end", sw.GetUrl())
-	value := fmt.Sprintf("{\"cid\":\"%s\"}", ci.String())
+	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
 		return false, err

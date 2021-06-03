@@ -23,3 +23,11 @@ func GetRootFromSealContext(ctx context.Context) (cid.Cid, error) {
 	}
 	return cid.Undef, fmt.Errorf("Can't find root cid from context")
 }
+
+func GetStoreFlag(root cid.Cid, blockCid cid.Cid) bool {
+	return sealedMap.blockExist(root, blockCid)
+}
+
+func SetStoreFlag(root cid.Cid, blockCid cid.Cid) {
+	sealedMap.addBlock(root, blockCid)
+}
