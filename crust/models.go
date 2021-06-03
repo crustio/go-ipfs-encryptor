@@ -48,8 +48,8 @@ func IsWarpedSealedBlock(block interface{}) bool {
 
 // Sealed block info
 type SealedBlock struct {
-	Path string `json:"path"`
-	Size int    `json:"size"`
+	Path string `json:"p"`
+	Size int    `json:"s"`
 }
 
 func TryGetSealedBlock(value []byte) (bool, *SealedBlock) {
@@ -72,7 +72,7 @@ func (sb *SealedBlock) ToSealedInfo() *SealedInfo {
 
 // All sealed block info
 type SealedInfo struct {
-	Sbs []SealedBlock `json:"sbs"`
+	Sbs []SealedBlock `json:"b"`
 }
 
 func (si *SealedInfo) Bytes() []byte {
