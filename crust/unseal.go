@@ -13,12 +13,12 @@ func Unseal(path string) ([]byte, error, int) {
 func GetSize(item *badger.Item) (int, error) {
 	value, err := item.ValueCopy(nil)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	if ok, si := TryGetSealedInfo(value); ok {
 		if len(si.Sbs) == 0 {
-			return 0, fmt.Errorf("Sbs is empty, can't get block size")
+			return -1, fmt.Errorf("Sbs is empty, can't get block size")
 		}
 		return si.Sbs[0].Size, nil
 	}
