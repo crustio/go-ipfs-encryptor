@@ -100,7 +100,7 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 
 		if sealResp.StatusCode != 0 {
 			fmt.Printf("%s\n", string(returnBody))
-			return false, nil
+			return false, fmt.Errorf("Seal response error code is: %d", sealResp.StatusCode)
 		}
 		sealedMap.addRoot(root)
 		return true, nil
@@ -146,7 +146,7 @@ func (sw *SWorker) Seal(root cid.Cid, newBlock bool, value []byte) (bool, string
 
 		if sealResp.StatusCode != 0 {
 			fmt.Printf("%s\n", string(returnBody))
-			return false, "", nil
+			return false, "", fmt.Errorf("Seal response error code is: %d", sealResp.StatusCode)
 		}
 		return true, sealResp.Path, nil
 	} else {
@@ -194,7 +194,7 @@ func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 
 		if sealResp.StatusCode != 0 {
 			fmt.Printf("%s\n", string(returnBody))
-			return false, nil
+			return false, fmt.Errorf("Seal response error code is: %d", sealResp.StatusCode)
 		}
 
 		return true, nil
