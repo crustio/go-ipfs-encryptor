@@ -76,13 +76,13 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Seal: %s", err)
 	}
 
 	// Request
 	resp, err := sw.client.Do(req)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Seal: %s", err)
 	}
 
 	// Deal response
@@ -90,12 +90,12 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 		returnBody, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("Seal: %s", err)
 		}
 		sealResp := &sealResponse{}
 		err = json.Unmarshal(returnBody, sealResp)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("Seal: %s", err)
 		}
 
 		if sealResp.StatusCode != 0 {
@@ -107,7 +107,7 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 	} else {
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
-		return false, fmt.Errorf("Start seal error code is: %d", resp.StatusCode)
+		return false, fmt.Errorf("Start Seal error code is: %d", resp.StatusCode)
 	}
 
 }
@@ -122,13 +122,13 @@ func (sw *SWorker) Seal(root cid.Cid, newBlock bool, value []byte) (bool, string
 	url := fmt.Sprintf("%s/storage/seal?cid=%s&new_block=%t", sw.GetUrl(), root.String(), newBlock)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(value))
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("Seal: %s", err)
 	}
 
 	// Request
 	resp, err := sw.client.Do(req)
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("Seal: %s", err)
 	}
 
 	// Deal response
@@ -136,12 +136,12 @@ func (sw *SWorker) Seal(root cid.Cid, newBlock bool, value []byte) (bool, string
 		returnBody, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return false, "", err
+			return false, "", fmt.Errorf("Seal: %s", err)
 		}
 		sealResp := &sealResponse{}
 		err = json.Unmarshal(returnBody, sealResp)
 		if err != nil {
-			return false, "", err
+			return false, "", fmt.Errorf("Seal: %s", err)
 		}
 
 		if sealResp.StatusCode != 0 {
@@ -170,13 +170,13 @@ func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Seal: %s", err)
 	}
 
 	// Request
 	resp, err := sw.client.Do(req)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Seal: %s", err)
 	}
 
 	// Deal response
@@ -184,12 +184,12 @@ func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 		returnBody, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("Seal: %s", err)
 		}
 		sealResp := &sealResponse{}
 		err = json.Unmarshal(returnBody, sealResp)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("Seal: %s", err)
 		}
 
 		if sealResp.StatusCode != 0 {
@@ -201,7 +201,7 @@ func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 	} else {
 		_, _ = io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
-		return false, fmt.Errorf("End seal error code is: %d", resp.StatusCode)
+		return false, fmt.Errorf("End Seal error code is: %d", resp.StatusCode)
 	}
 
 }
@@ -209,7 +209,7 @@ func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 func (sw *SWorker) unseal(path string) ([]byte, error, int) {
 	// Not config sworker
 	if len(sw.GetUrl()) == 0 {
-		return nil, fmt.Errorf("Missing crust config"), 0
+		return nil, fmt.Errorf("Unseal missing crust config"), 0
 	}
 
 	// Generate request
@@ -217,13 +217,13 @@ func (sw *SWorker) unseal(path string) ([]byte, error, int) {
 	body := fmt.Sprintf("{\"path\":\"%s\"}", path)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(body)))
 	if err != nil {
-		return nil, err, 0
+		return nil, fmt.Errorf("Unseal: %s", err), 0
 	}
 
 	// Request
 	resp, err := sw.client.Do(req)
 	if err != nil {
-		return nil, err, 0
+		return nil, fmt.Errorf("Unseal: %s", err), 0
 	}
 
 	// Deal response
@@ -231,7 +231,7 @@ func (sw *SWorker) unseal(path string) ([]byte, error, int) {
 		returnBody, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return nil, err, 0
+			return nil, fmt.Errorf("Unseal: %s", err), 0
 		}
 		return returnBody, nil, 200
 	} else {
