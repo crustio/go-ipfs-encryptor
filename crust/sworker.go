@@ -73,7 +73,7 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 
 	// Generate request
 	url := fmt.Sprintf("%s/storage/seal_start", sw.GetUrl())
-	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
+	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.Hash().B58String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
 		return false, fmt.Errorf("Seal: %s", err)
@@ -119,7 +119,7 @@ func (sw *SWorker) Seal(root cid.Cid, newBlock bool, value []byte) (bool, string
 	}
 
 	// Generate request
-	url := fmt.Sprintf("%s/storage/seal?cid=%s&new_block=%t", sw.GetUrl(), root.String(), newBlock)
+	url := fmt.Sprintf("%s/storage/seal?cid=%s&new_block=%t", sw.GetUrl(), root.Hash().B58String(), newBlock)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(value))
 	if err != nil {
 		return false, "", fmt.Errorf("Seal: %s", err)
@@ -167,7 +167,7 @@ func (sw *SWorker) EndSeal(root cid.Cid) (bool, error) {
 
 	// Generate request
 	url := fmt.Sprintf("%s/storage/seal_end", sw.GetUrl())
-	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
+	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.Hash().B58String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
 		return false, fmt.Errorf("Seal: %s", err)
