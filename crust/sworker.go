@@ -73,7 +73,7 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 
 	// Generate request
 	url := fmt.Sprintf("%s/storage/seal_start", sw.GetUrl())
-	value := fmt.Sprintf("{\"cid\":\"%s\"}", root.String())
+	value := fmt.Sprintf("{\"cid\":\"%s\", \"cid_b58\":\"%s\"}", root.String(), root.Hash().B58String())
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(value)))
 	if err != nil {
 		return false, fmt.Errorf("Seal: %s", err)
