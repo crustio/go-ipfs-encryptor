@@ -14,18 +14,18 @@ import (
 )
 
 var sealedMap *safeSealedMap
-var sealBlackSet map[cid.Cid]bool
+var sealBlackSet map[string]bool
 var sealBlackList = []string{
 	"QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc",
 	"QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn",
+	"QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n",
 }
 
 func init() {
 	sealedMap = newSafeSealedMap()
-	sealBlackSet = make(map[cid.Cid]bool)
+	sealBlackSet = make(map[string]bool)
 	for _, v := range sealBlackList {
-		c, _ := cid.Decode(v)
-		sealBlackSet[c] = true
+		sealBlackSet[v] = true
 	}
 }
 
@@ -67,7 +67,7 @@ func (sw *SWorker) StartSeal(root cid.Cid) (bool, error) {
 		return false, nil
 	}
 
-	if _, ok := sealBlackSet[root]; ok {
+	if _, ok := sealBlackSet[root.Hash().B58String()]; ok {
 		return false, nil
 	}
 
